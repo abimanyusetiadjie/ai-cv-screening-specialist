@@ -1,0 +1,9 @@
+{
+  "job_title": "Backend Engineer",
+  "job_description": "Kami mencari Backend Engineer untuk membangun dan memelihara REST API pada sistem internal perusahaan manufaktur. Kandidat akan bekerja sama dengan tim data dan frontend untuk mengembangkan fitur baru, mengoptimalkan performa query database, dan memastikan sistem berjalan stabil pada skala produksi.",
+  "criteria": {
+    "min_experience_years": 2,
+    "required_skills": ["Python", "SQL"],
+    "min_education_level": "S1"
+  }
+}

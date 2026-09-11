@@ -1,0 +1,23 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.class
+
+# Environment variables (API Keys)
+.env
+*.env.local
+
+# Temporary & OS files
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+
+# Submission packaging folder
+submit_drive/

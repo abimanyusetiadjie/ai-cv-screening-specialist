@@ -1,0 +1,26 @@
+{
+  "plant_cad_drafter": {
+    "job_title": "Plant CAD Drafter & 3D Designer",
+    "job_description": "Kami mencari Plant CAD Drafter & 3D Designer untuk merancang gambar teknis layout pabrik, pemodelan 3D fasilitas manufaktur, dan gambar kerja instalasi mesin. Kandidat bertanggung jawab membuat gambar kerja presisi dengan AutoCAD dan SketchUp, berkoordinasi dengan tim engineering manufaktur, dan memastikan kepatuhan standar keselamatan desain.",
+    "criteria": {
+      "min_experience_years": 2,
+      "required_skills": [
+        "AutoCAD",
+        "SketchUp"
+      ],
+      "min_education_level": "SMK"
+    }
+  },
+  "backend_engineer": {
+    "job_title": "Backend Engineer (Sistem Informasi Pabrik)",
+    "job_description": "Kami mencari Backend Engineer untuk membangun dan memelihara REST API pada sistem internal perusahaan manufaktur (ERP, MES, dan Warehouse Management). Kandidat akan bekerja sama dengan tim data dan automasi untuk mengembangkan fitur baru, mengoptimalkan query database SQL, dan memastikan stabilitas sistem di lantai produksi.",
+    "criteria": {
+      "min_experience_years": 2,
+      "required_skills": [
+        "Python",
+        "SQL"
+      ],
+      "min_education_level": "S1"
+    }
+  }
+}

@@ -1,0 +1,286 @@
+{
+  "name": "AI CV Screening & HR Routing Pipeline (Manufacturing Enterprise)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cv-application",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-1",
+      "name": "Webhook - Job Portal Ingestion",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "cv-ingestion-webhook"
+    },
+    {
+      "parameters": {
+        "mailbox": "INBOX",
+        "downloadAttachments": true,
+        "options": {
+          "customEmailConfig": "[\"UNSEEN\", [\"HEADER\", \"SUBJECT\", \"Lamaran\"]]"
+        }
+      },
+      "id": "node-imap-2",
+      "name": "Email Watcher - recruitment@company.com",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [
+        200,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "raw-candidate-resumes",
+        "fileName": "={{ $json.job_id }}/{{ $now.toFormat('yyyyMMdd-HHmmss') }}_{{ $binary.data.fileName }}"
+      },
+      "id": "node-s3-3",
+      "name": "Store Raw CV (S3 / MinIO Local)",
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        460,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ai-service.internal:8000/api/v1/screen-cv",
+        "sendBinaryData": true,
+        "binaryPropertyName": "data",
+        "options": {
+          "timeout": 30000
+        },
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "job_id",
+              "value": "={{ $json.job_id || 'PLANT-CAD-001' }}"
+            },
+            {
+              "name": "job_description",
+              "value": "={{ $json.job_description }}"
+            },
+            {
+              "name": "min_experience_years",
+              "value": "={{ $json.min_experience || 2 }}"
+            },
+            {
+              "name": "required_skills",
+              "value": "AutoCAD, SketchUp"
+            },
+            {
+              "name": "min_education_level",
+              "value": "SMK"
+            }
+          ]
+        }
+      },
+      "id": "node-http-ai-4",
+      "name": "Call AI Screening Engine (Python/Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hard_filter_passed }}",
+              "value2": true
+            }
+          ],
+          "number": [
+            {
+              "value1": "={{ $json.final_score }}",
+              "operation": "largerEqual",
+              "value2": 75
+            }
+          ]
+        }
+      },
+      "id": "node-if-shortlist-5",
+      "name": "Filter: Skor >= 75 & Lolos Filter?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        960,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "recruitment-noreply@company.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "Undangan Wawancara Teknis — PT Manufaktur Tbk",
+        "text": "Halo {{ $json.name }},\n\nSelamat! Berdasarkan hasil evaluasi kualifikasi CV Anda untuk posisi {{ $json.position || 'Plant CAD Drafter' }}, Anda dinyatakan LOLOS seleksi awal dengan skor kesesuaian {{ $json.final_score }}/100.\n\nSilakan pilih jadwal wawancara teknis Anda melalui tautan berikut: https://recruitment.company.com/schedule/{{ $json.candidate_id }}\n\nSalam hangat,\nTim Rekrutmen Manufaktur"
+      },
+      "id": "node-email-invite-6",
+      "name": "Kirim Email Undangan Interview",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "channel": "#recruitment-manufacturing",
+        "text": "🚀 *Kandidat Unggulan Terdeteksi!*\n*Nama:* {{ $json.name }}\n*Skor Akhir:* {{ $json.final_score }}/100\n*Embedding Score:* {{ $json.embedding_score }} | *LLM Score:* {{ $json.llm_score }}\n*No. Telepon:* {{ $json.phone }}\n*Kekuatan Utama:* {{ $json.strengths.join(', ') }}\n*Catatan AI:* {{ $json.reasoning }}"
+      },
+      "id": "node-slack-7",
+      "name": "Notifikasi HR (Slack / Teams)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [
+        1220,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE job_applicants SET status = 'SHORTLISTED', score = {{ $json.final_score }}, updated_at = NOW() WHERE id = {{ $json.candidate_id }};"
+      },
+      "id": "node-ats-sync-8",
+      "name": "Sync Status ke ATS / HRIS Internal",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        1460,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO talent_pool (name, email, phone, skills, experience_years, score, notes) VALUES ('{{ $json.name }}', '{{ $json.email }}', '{{ $json.phone }}', '{{ $json.skills.join(\", \") }}', {{ $json.total_experience_years }}, {{ $json.final_score }}, '{{ $json.gaps.join(\"; \") }}');"
+      },
+      "id": "node-talent-pool-9",
+      "name": "Arsipkan ke Talent Pool Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        1220,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "recruitment-noreply@company.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "Update Status Lamaran — PT Manufaktur Tbk",
+        "text": "Halo {{ $json.name }},\n\nTerima kasih telah melamar untuk posisi {{ $json.position || 'Plant CAD Drafter' }}. Saat ini kami memutuskan untuk melanjutkan dengan kandidat lain yang profilnya lebih mendekati kebutuhan spesifik lini pabrik kami.\n\nProfil Anda telah kami simpan di Talent Pool perusahaan untuk peluang di masa mendatang.\n\nSalam hangat,\nTim Rekrutmen Manufaktur"
+      },
+      "id": "node-rejection-10",
+      "name": "Kirim Email Penolakan Sopan Otomatis",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        580
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - Job Portal Ingestion": {
+      "main": [
+        [
+          {
+            "node": "Store Raw CV (S3 / MinIO Local)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Watcher - recruitment@company.com": {
+      "main": [
+        [
+          {
+            "node": "Store Raw CV (S3 / MinIO Local)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Raw CV (S3 / MinIO Local)": {
+      "main": [
+        [
+          {
+            "node": "Call AI Screening Engine (Python/Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call AI Screening Engine (Python/Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Filter: Skor >= 75 & Lolos Filter?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Skor >= 75 & Lolos Filter?": {
+      "main": [
+        [
+          {
+            "node": "Kirim Email Undangan Interview",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notifikasi HR (Slack / Teams)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sync Status ke ATS / HRIS Internal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Arsipkan ke Talent Pool Database",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Kirim Email Penolakan Sopan Otomatis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "AI-Screening",
+    "Manufacturing-Recruitment",
+    "Enterprise-Architecture"
+  ]
+}
